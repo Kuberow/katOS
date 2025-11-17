@@ -4,7 +4,7 @@ local input = require("touchui.input")
 local list = require("touchui.lists")
 local draw = require("draw")
 local popups = require("touchui.popups")
-local window_manager = require("remos.window_manager")
+local window_manager = require("window_manager")
 
 -- Create window for home content
 local termW, termH = term.getSize()
