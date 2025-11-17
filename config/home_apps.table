@@ -1,0 +1,37 @@
+{
+  {
+    label = "Taskmon",
+    path = "remos/taskmon.lua",
+    iconFile = "icons/taskmon.icon",
+  },
+  {
+    label = "Internet",
+    path = "apps/itbrowser.lua",
+    iconFile = "icons/default.icon",
+  },  
+  {
+    label = "Store",
+    path = "apps/app_store.lua",
+    iconFile = "icons/default.icon",
+  },
+  {
+    label = "Browser",
+    path = "apps/browser.lua",
+    iconFile = "icons/browser.icon",
+  },
+  {
+    label = "Options",
+    path = "remos/settings.lua",
+    iconFile = "icons/settings.icon",
+  },
+  {
+    label = "Icon Edit",
+    path = "apps/iconedit.lua",
+    iconFile = "icons/icon_edit.icon",
+  },
+  {
+    label = "Theme Edit",
+    path = "apps/themeedit.lua",
+    iconFile = "icons/theme_edit.icon",
+  },
+}
