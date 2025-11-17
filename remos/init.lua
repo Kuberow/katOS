@@ -24,17 +24,8 @@ local termW, termH = term.getSize()
 local topBarWin = window.create(term.current(), 1, 1, termW, 1)
 local bottomBarWin = window.create(term.current(), 1, termH, termW, 1)
 
+-- Bottom bar removed for macOS-style clean interface
 local bottomBarHBox = container.hBox()
-local menu_button, home_button, back_button
-menu_button = input.buttonWidget("\127", function()
-    os.queueEvent("remos_menu_button")
-end, function() end, false)
-home_button = input.buttonWidget("\186", function()
-    os.queueEvent("remos_home_button")
-end, function() end, false)
-back_button = input.buttonWidget("<", function()
-    os.queueEvent("remos_back_button")
-end, function() end, false)
 bottomBarHBox:setWindow(bottomBarWin)
 bottomBarHBox:setTheme(barTheme)
 local bottomBarProcess = function()
@@ -121,15 +112,7 @@ local function reloadSettings()
     inverseButtons = settings.get("remos.invert_buttons")
     barTheme = { fg = tui.theme.barfg, bg = tui.theme.barbg }
     bottomBarHBox:clearWidgets()
-    if inverseButtons then
-        bottomBarHBox:addWidget(menu_button)
-        bottomBarHBox:addWidget(home_button)
-        bottomBarHBox:addWidget(back_button)
-    else
-        bottomBarHBox:addWidget(back_button)
-        bottomBarHBox:addWidget(home_button)
-        bottomBarHBox:addWidget(menu_button)
-    end
+    -- No buttons added to bottom bar for clean macOS-style interface
     bottomBarHBox:setTheme(barTheme)
     topBarHBox:setTheme(barTheme)
     if periphLabel then
