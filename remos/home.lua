@@ -6,7 +6,6 @@ local draw = require("draw")
 local popups = require("touchui.popups")
 local homeWin = window.create(term.current(), 1, 1, term.getSize())
 
-
 ---@class Shortcut
 ---@field icon BLIT?
 ---@field iconFile string?
@@ -20,9 +19,7 @@ local function saveShortcuts(shortcuts)
     assert(remos.saveTable("config/home_apps.table", shortcuts, false))
 end
 
-
 local defaultIcon = assert(remos.loadTransparentBlit("icons/default.icon"))
-
 local unknownIcon = assert(remos.loadTransparentBlit("icons/missing.icon"))
 
 local function loadShortcuts()
@@ -108,27 +105,58 @@ end
 
 local strings = require "cc.strings"
 
+-- macOS-style rendering with dock-like appearance
 gridList = list.gridListWidget(shortcuts, homeSize, homeSize, function(win, x, y, w, h, item, theme)
     local icon = item.icon or defaultIcon
+    
+    -- Draw subtle background for icon area (macOS-style frosted glass effect)
+    local bgColor = colors.lightGray
+    local textColor = colors.black
+    
+    -- Calculate icon position (centered)
     local iconx = math.floor((w - 5) / 2)
-    local wrapped = strings.wrap(item.label, w - 1)
-    local totalh = 3 + #wrapped
-    local icony = math.max(math.floor((h - totalh) / 2), 1)
-    draw.draw_blit(x + iconx, icony + y, icon, win)
-    for i, t in ipairs(wrapped) do
-        local toy = icony + i + 2
-        if toy > h then
-            break
-        end
-        local ty = toy + y
-        local tx = x + math.floor((w - #t) / 2)
-        draw.text(tx, ty, t, win)
+    local icony = math.floor((h - 3) / 2) - 1
+    
+    -- Draw rounded background for icon
+    if theme and theme.background then
+        bgColor = theme.background
+    end
+    
+    -- Create subtle card effect
+    for dy = 0, 2 do
+        win.setCursorPos(x + iconx, y + icony + dy)
+        win.setBackgroundColor(bgColor)
+        win.write("     ")
+    end
+    
+    -- Draw the icon
+    draw.draw_blit(x + iconx, y + icony, icon, win)
+    
+    -- Draw label below icon (macOS uses centered, single-line labels)
+    local wrapped = strings.wrap(item.label, w - 2)
+    local labelText = wrapped[1] or item.label
+    
+    -- Truncate with ellipsis if too long
+    if #labelText > w - 2 then
+        labelText = string.sub(labelText, 1, w - 4) .. ".."
+    end
+    
+    local labelY = y + icony + 4
+    local labelX = x + math.floor((w - #labelText) / 2)
+    
+    -- Draw label with slight shadow effect
+    if labelY <= y + h - 1 then
+        win.setCursorPos(labelX, labelY)
+        win.setBackgroundColor(theme and theme.background or colors.gray)
+        win.setTextColor(theme and theme.text or colors.white)
+        win.write(labelText)
     end
 end, function(index, item)
     remos.addAppFile(item.path)
 end, function(index, item)
     shortcutMenu(index, item.label, item.path, item.iconSmallFile, item.iconLargeFile)
 end)
+
 gridList:setWindow(homeWin)
 
 tui.run(gridList, nil, function(event)
