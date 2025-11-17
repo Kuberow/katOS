@@ -7,7 +7,7 @@ local popups = require("touchui.popups")
 
 -- Create window for home content (leave space for dock at bottom)
 local termW, termH = term.getSize()
-local dockHeight = 2
+local dockHeight = 3
 local homeWin = window.create(term.current(), 1, 1, termW, termH - dockHeight)
 
 ---@class Shortcut
@@ -40,6 +40,14 @@ end
 local shortcuts = loadShortcuts()
 local gridList
 
+-- Window control buttons state
+local windowState = {
+    maximized = false,
+    minimized = false,
+    originalSize = {w = termW, h = termH},
+    originalPos = {x = 1, y = 1}
+}
+
 ---Update/create/delete a shortcut
 ---@param index integer
 ---@param label string?
@@ -47,8 +55,8 @@ local gridList
 ---@param iconSmallFile string?
 ---@param iconLargeFile string?
 local function shortcutMenu(index, label, path, iconSmallFile, iconLargeFile)
-    -- macOS-style window with rounded corners and shadow effect
-    local rootWin = window.create(term.current(), 1, 1, term.getSize())
+    -- macOS-style window with proper control buttons
+    local rootWin = window.create(term.current(), 3, 3, termW - 4, termH - 6)
     local rootVbox = container.vBox()
     rootVbox:setWindow(rootWin)
     
@@ -57,22 +65,45 @@ local function shortcutMenu(index, label, path, iconSmallFile, iconLargeFile)
     rootWin.setTextColor(colors.black)
     rootWin.clear()
     
-    -- Title bar (macOS style with traffic lights)
+    -- Title bar with proper control buttons
     local w, h = rootWin.getSize()
+    
+    -- Title bar background
     rootWin.setCursorPos(1, 1)
-    rootWin.setBackgroundColor(colors.lightGray)
-    rootWin.clearLine()
-    rootWin.setCursorPos(2, 1)
-    rootWin.setTextColor(colors.red)
-    rootWin.write("\7")
-    rootWin.setTextColor(colors.yellow)
-    rootWin.write("\7")
-    rootWin.setTextColor(colors.lime)
-    rootWin.write("\7")
-    rootWin.setTextColor(colors.gray)
+    rootWin.setBackgroundColor(colors.gray)
+    for x = 1, w do
+        rootWin.setCursorPos(x, 1)
+        rootWin.write(" ")
+    end
+    
+    -- Control buttons (left side - macOS style)
+    local buttonY = 1
+    rootWin.setCursorPos(2, buttonY)
+    rootWin.setBackgroundColor(colors.red)
+    rootWin.write(" × ") -- Close
+    
+    rootWin.setCursorPos(6, buttonY)
+    rootWin.setBackgroundColor(colors.yellow)
+    rootWin.write(" - ") -- Minimize
+    
+    rootWin.setCursorPos(10, buttonY)
+    rootWin.setBackgroundColor(colors.lime)
+    rootWin.write(" + ") -- Maximize
+    
+    -- Window title (centered)
+    rootWin.setBackgroundColor(colors.gray)
+    rootWin.setTextColor(colors.white)
     local title = index <= #shortcuts and "Edit Shortcut" or "New Shortcut"
     rootWin.setCursorPos(math.floor((w - #title) / 2), 1)
     rootWin.write(title)
+
+    -- Content area
+    local contentWin = window.create(rootWin, 1, 2, w, h - 1)
+    contentWin.setBackgroundColor(colors.white)
+    contentWin.setTextColor(colors.black)
+    contentWin.clear()
+    
+    rootVbox:setWindow(contentWin)
 
     local labelInput = input.inputWidget("Label")
     rootVbox:addWidget(labelInput)
@@ -86,6 +117,10 @@ local function shortcutMenu(index, label, path, iconSmallFile, iconLargeFile)
     iconFilePicker.selected = iconSmallFile
     rootVbox:addWidget(iconFilePicker)
 
+    -- Buttons container
+    local buttonContainer = container.hBox()
+    rootVbox:addWidget(buttonContainer)
+
     local deleteButton = input.buttonWidget("Delete", function(self)
         table.remove(shortcuts, index)
         saveShortcuts(shortcuts)
@@ -93,12 +128,12 @@ local function shortcutMenu(index, label, path, iconSmallFile, iconLargeFile)
         gridList:setTable(shortcuts)
         rootVbox.exit = true
     end)
-    rootVbox:addWidget(deleteButton, 3)
-    
+    buttonContainer:addWidget(deleteButton)
+
     local cancelButton = input.buttonWidget("Cancel", function(self)
         rootVbox.exit = true
     end)
-    rootVbox:addWidget(cancelButton, 3)
+    buttonContainer:addWidget(cancelButton)
     
     local saveButton = input.buttonWidget("Save", function(self)
         if type(labelInput.value) == "string" and type(pathPicker.selected) == "string" then
@@ -116,7 +151,38 @@ local function shortcutMenu(index, label, path, iconSmallFile, iconLargeFile)
         gridList:setTable(shortcuts)
         rootVbox.exit = true
     end)
-    rootVbox:addWidget(saveButton, 3)
+    buttonContainer:addWidget(saveButton)
+
+    -- Handle control button clicks
+    local function handleControlClick(x, y)
+        if y == 1 then
+            if x >= 2 and x <= 4 then -- Close button
+                rootVbox.exit = true
+            elseif x >= 6 and x <= 8 then -- Minimize button
+                -- For now, just close since we don't have proper window management
+                rootVbox.exit = true
+            elseif x >= 10 and x <= 12 then -- Maximize button
+                -- Toggle between original and maximized size
+                if rootWin.getSize() == termW - 4 and termH - 6 then
+                    rootWin.reposition(1, 1, termW, termH)
+                else
+                    rootWin.reposition(3, 3, termW - 4, termH - 6)
+                end
+            end
+        end
+    end
+
+    -- Custom event handler for control buttons
+    local originalEvent = rootVbox.event
+    rootVbox.event = function(self, event, ...)
+        if event == "mouse_click" then
+            local button, x, y = ...
+            local winX, winY = rootWin.getPosition()
+            local absX, absY = x - winX + 1, y - winY + 1
+            handleControlClick(absX, absY)
+        end
+        return originalEvent(self, event, ...)
+    end
 
     tui.run(rootVbox, true, nil, true)
 end
@@ -157,57 +223,142 @@ end, function(index, item)
 end)
 gridList:setWindow(homeWin)
 
--- Draw macOS-style dock at the bottom
+-- Enhanced dock drawing function
 local function drawDock()
     local dockWin = window.create(term.current(), 1, termH - dockHeight + 1, termW, dockHeight)
-    dockWin.setBackgroundColor(colors.gray)
+    
+    -- Clear dock area
+    dockWin.setBackgroundColor(colors.black)
     dockWin.clear()
     
-    -- Draw dock background with rounded top
+    -- Draw dock background with gradient effect
+    for y = 1, dockHeight do
+        dockWin.setCursorPos(1, y)
+        if y == 1 then
+            dockWin.setBackgroundColor(colors.gray)
+        else
+            dockWin.setBackgroundColor(colors.lightGray)
+        end
+        for x = 1, termW do
+            dockWin.write(" ")
+        end
+    end
+    
+    -- Draw separator line
     dockWin.setCursorPos(1, 1)
-    dockWin.setBackgroundColor(colors.lightGray)
-    dockWin.clearLine()
+    dockWin.setBackgroundColor(colors.black)
+    dockWin.setTextColor(colors.gray)
+    for x = 1, termW do
+        dockWin.write("▀")
+    end
     
     -- Draw app icons in dock (first few shortcuts)
-    local dockApps = math.min(#shortcuts, 8)
-    local spacing = math.floor(termW / (dockApps + 1))
+    local dockApps = math.min(#shortcuts, 6) -- Reduced for better spacing
+    local totalWidth = dockApps * 6 + (dockApps - 1) * 2
+    local startX = math.floor((termW - totalWidth) / 2)
     
     for i = 1, dockApps do
         local item = shortcuts[i]
         local icon = item.icon or defaultIcon
-        local x = i * spacing - 2
-        if x > 0 and x + 4 <= termW then
-            -- Draw small icon representation
-            dockWin.setCursorPos(x, 1)
+        local x = startX + (i - 1) * 8
+        
+        -- Draw icon background (rounded effect)
+        dockWin.setBackgroundColor(colors.lightGray)
+        for dy = 2, dockHeight do
+            dockWin.setCursorPos(x, dy)
+            dockWin.write("  ")
+            dockWin.setCursorPos(x + 3, dy)
+            dockWin.write("  ")
+        end
+        
+        -- Draw icon (simplified representation)
+        dockWin.setCursorPos(x + 1, 3)
+        dockWin.setBackgroundColor(colors.lightGray)
+        dockWin.setTextColor(colors.blue)
+        dockWin.write("[")
+        dockWin.setTextColor(colors.black)
+        dockWin.write(string.sub(item.label, 1, 1))
+        dockWin.setTextColor(colors.blue)
+        dockWin.write("]")
+        
+        -- Draw app label below icon
+        if #item.label > 0 then
+            dockWin.setCursorPos(x, dockHeight)
             dockWin.setBackgroundColor(colors.lightGray)
-            dockWin.write("[")
             dockWin.setTextColor(colors.black)
-            dockWin.write(string.sub(item.label, 1, 1))
-            dockWin.write("]")
+            local displayLabel = string.sub(item.label, 1, 4)
+            dockWin.write(" " .. displayLabel .. " ")
         end
     end
     
-    -- Page indicators on second line
+    -- Page indicators
     if gridList and gridList.pages and gridList.pages > 1 then
         local str = ""
         for i = 1, gridList.pages do
             if gridList.page == i then
-                str = str .. "\7"
+                str = str .. "●"
             else
-                str = str .. "\186"
+                str = str .. "○"
             end
             if i < gridList.pages then
                 str = str .. " "
             end
         end
         dockWin.setCursorPos(math.floor((termW - #str) / 2), 2)
-        dockWin.setTextColor(colors.white)
-        dockWin.setBackgroundColor(colors.gray)
+        dockWin.setTextColor(colors.black)
+        dockWin.setBackgroundColor(colors.lightGray)
         dockWin.write(str)
     end
+    
+    -- System info on right side
+    local timeText = textutils.formatTime(os.time("local"), false)
+    dockWin.setCursorPos(termW - #timeText - 1, 2)
+    dockWin.setTextColor(colors.black)
+    dockWin.setBackgroundColor(colors.lightGray)
+    dockWin.write(timeText)
 end
 
--- Custom run loop that includes dock rendering
+-- Window control functions
+local function toggleMaximize()
+    if windowState.maximized then
+        -- Restore original size
+        homeWin.reposition(windowState.originalPos.x, windowState.originalPos.y, 
+                          windowState.originalSize.w, windowState.originalSize.h)
+        windowState.maximized = false
+    else
+        -- Save current state and maximize
+        windowState.originalSize.w, windowState.originalSize.h = homeWin.getSize()
+        windowState.originalPos.x, windowState.originalPos.y = homeWin.getPosition()
+        homeWin.reposition(1, 1, termW, termH - dockHeight)
+        windowState.maximized = true
+    end
+    drawDock()
+end
+
+local function minimizeApp()
+    windowState.minimized = true
+    -- In a real system, this would hide the window
+    -- For now, we'll just clear and show a message
+    homeWin.setBackgroundColor(colors.black)
+    homeWin.clear()
+    homeWin.setCursorPos(2, math.floor((termH - dockHeight) / 2))
+    homeWin.setTextColor(colors.white)
+    homeWin.write("App minimized - click to restore")
+end
+
+local function closeApp()
+    -- In a real system, this would exit the app
+    -- For now, we'll just clear and exit the event loop
+    homeWin.setBackgroundColor(colors.black)
+    homeWin.clear()
+    homeWin.setCursorPos(2, math.floor((termH - dockHeight) / 2))
+    homeWin.setTextColor(colors.white)
+    homeWin.write("App closed")
+    os.sleep(2)
+    return true -- Signal to exit
+end
+
+-- Custom run loop that includes dock rendering and window controls
 local function runWithDock()
     parallel.waitForAny(
         function()
@@ -223,18 +374,44 @@ local function runWithDock()
                     defaultIcon = assert(remos.loadTransparentBlit("icons/default.icon"))
                 elseif event == "add_home_shortcut" then
                     shortcutMenu(#shortcuts + 1)
+                elseif event == "window_maximize" then
+                    toggleMaximize()
+                elseif event == "window_minimize" then
+                    minimizeApp()
+                elseif event == "window_close" then
+                    if closeApp() then
+                        return true
+                    end
                 end
                 drawDock()
             end, true)
         end,
         function()
             while true do
-                os.pullEvent()
+                local event, param1, param2, param3 = os.pullEvent()
+                if event == "mouse_click" then
+                    local button, x, y = param1, param2, param3
+                    -- Check if click is in dock area for quick app launches
+                    if y >= termH - dockHeight + 2 and y <= termH then
+                        local dockApps = math.min(#shortcuts, 6)
+                        local totalWidth = dockApps * 6 + (dockApps - 1) * 2
+                        local startX = math.floor((termW - totalWidth) / 2)
+                        
+                        for i = 1, dockApps do
+                            local appX = startX + (i - 1) * 8
+                            if x >= appX and x <= appX + 5 and y >= termH - 1 then
+                                remos.addAppFile(shortcuts[i].path)
+                                break
+                            end
+                        end
+                    end
+                end
                 drawDock()
             end
         end
     )
 end
 
+-- Initial draw
 drawDock()
 runWithDock()
