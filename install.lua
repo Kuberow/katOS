@@ -54,6 +54,8 @@ local files = {
         ["settings.lua"] = fromRepository "remos/settings.lua",
         ["splash.lua"] = fromRepository "remos/splash.lua",
         ["taskmon.lua"] = fromRepository "remos/taskmon.lua",
+        ["window_manager.lua"] = fromRepository "remos/window_manager.lua",
+        ["app_window.lua"] = fromRepository "remos/app_window.lua",
     },
     themes = {
         palettes = {
