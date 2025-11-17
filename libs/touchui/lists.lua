@@ -261,15 +261,22 @@ function gridListWidget__index:updateTable()
 end
 
 function gridListWidget__index:postDraw()
-    local str = ""
-    for i = 1, self.pages do
-        if self.page == i then
-            str = str .. " \7 "
-        else
-            str = str .. "\186"
+    -- macOS-style page indicators at the bottom (last visible line)
+    if self.pages > 1 then
+        local str = ""
+        for i = 1, self.pages do
+            if self.page == i then
+                str = str .. "\7"
+            else
+                str = str .. "\186"
+            end
+            if i < self.pages then
+                str = str .. " "
+            end
         end
+        -- Draw on the last line of the window (h, not h-1)
+        draw.center_text(self.h, str, self.window)
     end
-    draw.center_text(self.h, str, self.window)
 end
 
 function gridListWidget__index:dragStart(button, sx, sy, nx, ny)
