@@ -1,4 +1,4 @@
-local repositoryUrl = "https://raw.githubusercontent.com/Kuberow/kos/main/"
+local repositoryUrl = "https://raw.githubusercontent.com/Kuberow/katOS/main/"
 
 local function fromURL(url)
     return { url = url }
@@ -94,13 +94,13 @@ term.setTextColor(colors.black)
 term.clear()
 
 local function title()
-    bigfont.writeOn(term, 1, "KOS", math.floor(w / 2 - #("KOS")) - 1, 2)
+    bigfont.writeOn(term, 1, "katOS", math.floor(w / 2 - #("katOS")) - 1, 2)
 end
 
 title()
 
 local introduction = strings.wrap(
-    "Welcome to KOS\nIn order to continue the installation, click on \"Continue\".\n\nHold CTRL+T to cancel.",
+    "Welcome to katOS\nIn order to continue the installation, click on \"Continue\".\n\nHold CTRL+T to cancel.",
     w - (margin * 2)
 )
 
